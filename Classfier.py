@@ -1,3 +1,4 @@
+#%%
 import os
 import tensorflow as tf
 import numpy as np
@@ -5,7 +6,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras import backend, optimizers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import GaussianNoise, Dense
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, LearningRateScheduler
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, LearningRateScheduler, ReduceLROnPlateau
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 from tensorflow.python.client import device_lib
 from vit_keras import vit
@@ -13,19 +14,22 @@ from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
 TEST_SIZE = 224
 groups={
-    0:"birds",
-    1:"buffalo",
-    2:"buildings",
-    3:"cats",
-    4:"deers",
-    5:"elephants",
-    6:"girafe",
-    7:"horses",
-    8:"insects",
-    9:"mountains",
-    10:"others",
-    11:"rivers",
-    12:"skys"
+    # 0:"birds",
+    # 1:"buffalo",
+    # 2:"buildings",
+    # 3:"cats",
+    # 4:"deers",
+    # 5:"elephants",
+    # 6:"girafe",
+    # 7:"horses",
+    # 8:"insects",
+    # 9:"mountains",
+    # 10:"others",
+    # 11:"rivers",
+    # 12:"skys"
+    0:"animals",
+    1:"buildings",
+    2:"landscapes"
 }
 class Utility():
     def __init__(self):
@@ -142,6 +146,14 @@ class BirdClassfier():
             else:
                 return lr
         lr_scheduler_callback = LearningRateScheduler(scheduler)
+        reduceLr = ReduceLROnPlateau(
+            monitor='val_accuracy',
+            factor=0.5,
+            patience=2,
+            verbose=1,
+            mode='max',
+            min_lr=0.0001)
+
         finetune_at = 28
         # fine-tuning
         for layer in vit_model.layers[:finetune_at - 1]:
@@ -160,44 +172,56 @@ class BirdClassfier():
                     metrics=["accuracy"])                      
         history = model.fit(
                 train_generator,
-                epochs=20,
+                epochs=40,
                 validation_data=validation_generator,
                 verbose=1, 
                 shuffle=True,
-                # callbacks=[
-                #     EarlyStopping(monitor="val_accuracy", patience=10, restore_best_weights=True),
-                #     lr_scheduler_callback,
-                # ]
-                callbacks=None
+                callbacks=[
+                    # EarlyStopping(monitor="val_accuracy", 
+                    # patience=10, 
+                    # restore_best_weights=True),
+                    # lr_scheduler_callback
+                    reduceLr
+                ]
+                # callbacks=None
                 )
         #save model
-        # from tensorflow import keras
-        # model.save('/home/chenhsi/Projects/Xihelm/myModel')
+        from tensorflow import keras
+        model.save('/home/chenhsi/Projects/Xihelm/myModel.h5')
+        model.save_weights('/home/chenhsi/Projects/Xihelm/myModel_weights.h5')
         # modelSave=keras.models.load_model('/home/chenhsi/Projects/Xihelm/myModel')
 
-        def LoadImg(imgPath):
+        def LoadImg(imgPath, show=True):
             img=load_img(imgPath,target_size=(TEST_SIZE,TEST_SIZE))
             imgTensor=img_to_array(img)
             imgTensor=np.expand_dims(imgTensor,axis=0)
             imgTensor /=255
+            if show:
+                plt.imshow(imgTensor[0])
+                plt.axis('off')
+                plt.show()
+
             return imgTensor
 
         #prediction
         folders=[
-            '/home/chenhsi/Projects/Xihelm/input/test/birds',
-            '/home/chenhsi/Projects/Xihelm/input/test/buffalo',
-            '/home/chenhsi/Projects/Xihelm/input/test/buildings',
-            '/home/chenhsi/Projects/Xihelm/input/test/cats',
-            '/home/chenhsi/Projects/Xihelm/input/test/deers',
-            '/home/chenhsi/Projects/Xihelm/input/test/elephants',
-            '/home/chenhsi/Projects/Xihelm/input/test/girafe',
-            '/home/chenhsi/Projects/Xihelm/input/test/horses',
-            '/home/chenhsi/Projects/Xihelm/input/test/insects',
-            '/home/chenhsi/Projects/Xihelm/input/test/mountains',
-            '/home/chenhsi/Projects/Xihelm/input/test/others',
-            '/home/chenhsi/Projects/Xihelm/input/test/rivers',
-            '/home/chenhsi/Projects/Xihelm/input/test/skys',
+            # '/home/chenhsi/Projects/Xihelm/input/test/birds',
+            # '/home/chenhsi/Projects/Xihelm/input/test/buffalo',
+            # '/home/chenhsi/Projects/Xihelm/input/test/buildings',
+            # '/home/chenhsi/Projects/Xihelm/input/test/cats',
+            # '/home/chenhsi/Projects/Xihelm/input/test/deers',
+            # '/home/chenhsi/Projects/Xihelm/input/test/elephants',
+            # '/home/chenhsi/Projects/Xihelm/input/test/girafe',
+            # '/home/chenhsi/Projects/Xihelm/input/test/horses',
+            # '/home/chenhsi/Projects/Xihelm/input/test/insects',
+            # '/home/chenhsi/Projects/Xihelm/input/test/mountains',
+            # '/home/chenhsi/Projects/Xihelm/input/test/others',
+            # '/home/chenhsi/Projects/Xihelm/input/test/rivers',
+            # '/home/chenhsi/Projects/Xihelm/input/test/skys',
 
+            '/home/chenhsi/Projects/Xihelm/input/test/animals',
+            '/home/chenhsi/Projects/Xihelm/input/test/buildings',
+            '/home/chenhsi/Projects/Xihelm/input/test/landscapes'
         ]
         for folder in folders:
             print("this folder: ",folder)
@@ -206,8 +230,8 @@ class BirdClassfier():
                 imgTensor=LoadImg(img)
                 pred=model.predict(imgTensor)
                 classes = model.predict_classes(imgTensor)
-                print(pred)
-                print(classes)
+                # print(pred)
+                # print(classes)
                 print("this is: ",groups[classes[0]])
         history_dict = history.history
         loss_values = history_dict["loss"]
